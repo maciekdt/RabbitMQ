@@ -1,0 +1,147 @@
+<html>
+
+<head>
+
+</head>
+
+<body>
+    <button id="refreshButton">Refresh</button>
+
+    <table id="elementTable" border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Sold</th>
+                <th>Available</th>
+                <th>Actions</th>
+                <th>Image</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+        <tfoot>
+            <tr>
+                <form id="myForm">
+                    <td>
+                        <input type="number" name="id" placeholder="Id" required><br>
+                    </td>
+                    <td>
+                        <input type="text" name="name" placeholder="Name" required><br>
+                    </td>
+                    <td>
+                        <input type="number" name="price" placeholder="Price" required><br>
+                    </td>
+                    <td>
+                        <input type="checkbox" name="sold" id="checkboxSold">
+                    </td>
+                    <td>
+                        <input type="checkbox" name="available" id="checkboxAvailable">
+                    </td>
+                    <td>
+                        <input type="submit" value="add">
+                    </td>
+                </form>
+            </tr>
+        </tfoot>
+    </table>
+</body>
+
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+
+<script type="text/javascript">
+    const url = 'http://localhost:8080'
+    refresh()
+    document.getElementById("refreshButton").addEventListener("click", function() {
+        refresh()
+    })
+    $(document).ready(function() {
+        $("#myForm").submit(function(event) {
+            event.preventDefault();
+            var formData = $(this).serializeArray();
+            var jsonData = {};
+            $.each(formData, function(index, field) {
+                jsonData[field.name] = field.value;
+            })
+            jsonData.sold = $("#checkboxSold").is(":checked")
+            jsonData.available = $("#checkboxAvailable").is(":checked")
+
+            $.ajax({
+                    url: url + "/articles",
+                    type: "POST",
+                    contentType: "application/json; charset=utf-8",
+                    dataType: "json",
+                    data: JSON.stringify(jsonData)
+
+                })
+                .done(function(data) {
+                    refresh()
+                    $("myForm :input").val('')
+                })
+                .fail(function(xhr, status, error) {
+                    if (xhr.status == 409) {
+                        alert("Article with given id already exist")
+                    }
+                })
+        })
+    })
+
+    function refresh() {
+        $.ajax({
+                url: url + "/articles",
+                method: "GET"
+            })
+            .done(function(data) {
+                $("#tableBody").empty()
+                $.each(data._embedded.articleList, function(index, element) {
+                    var row = $("<tr>");
+                    row.append($("<td>").text(element.id));
+                    row.append($("<td>").text(element.name));
+                    row.append($("<td>").text(element.price));
+                    row.append($("<td>").text(element.sold));
+                    row.append($("<td>").text(element.available));
+
+                    var actionCell = $("<td>");
+
+                    $.each(element._links, function(index, action) {
+                        if (index == "sell" && !element.available) return true
+                        var actionButton = $("<button>")
+                        actionButton.text(index)
+                        actionButton.click(function() {
+                            var requestType = "";
+                            if (index === "delete") {
+                                requestType = "DELETE"
+                            } else if (index === "sell") {
+                                requestType = "PUT"
+                            } else {
+                                requestType = "GET"
+                            }
+                            $.ajax({
+                                    type: requestType,
+                                    url: action.href
+                                })
+                                .done(function(data) {
+                                    refresh()
+                                })
+                        })
+                        actionCell.append(actionButton)
+                    })
+                    row.append(actionCell)
+
+                    var imageCell = $("<td>");
+                    var img = $("<img>");
+                    img.attr("src", url + "/articles/" + element.id + "/image");
+                    imageCell.append(img)
+                    row.append(imageCell)
+
+                    $("#tableBody").append(row);
+                })
+            })
+            .fail(function(xhr, status, error) {})
+    }
+</script>
+
+</html>
